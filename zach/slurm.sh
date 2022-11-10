@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mimic_cxr_cs334
 #SBATCH --output=out_slur
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 #SBATCH -o %A.out
 #SBATCH -e %A.err
 

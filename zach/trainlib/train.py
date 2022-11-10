@@ -112,20 +112,37 @@ def get_image_generators(train, valid, test, config):
 
     return train_batches, validate_batches, test_batches
 
-def get_model(num_classes):
-    
-    base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='max')
-    x = base_model.output
-    x = Dense(512, activation = 'relu')(x)
-    x = Dropout(0.3)(x)
+def get_model(config):
 
-    # Add an individual classification layer for every class.
-    output = []
-    for i in range(num_classes):
-        output.append(Dense(1, activation='sigmoid')(x))
-    
-    model = Model(inputs=base_model.input, outputs=output)
-    print(model.summary())
+    num_classes = config['NUM_CLASSES']
+    lr = config['INITIAL_LR']
+
+    strategy = tf.distribute.MirroredStrategy()
+
+    with strategy.scope():
+
+        base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='max')
+        x = base_model.output
+        x = Dense(512, activation = 'relu')(x)
+        x = Dropout(0.3)(x)
+
+        # Add an individual classification layer for every class.
+        output = []
+        for i in range(num_classes):
+            output.append(Dense(1, activation='sigmoid')(x))
+        
+        model = Model(inputs=base_model.input, outputs=output)
+        print(model.summary())
+
+        losses = ['binary_crossentropy' for i in range(num_classes)]
+        # Need to compile model with an individual loss function for each layer.
+        model.compile(optimizer=Adam(lr),
+            loss=losses,
+            metrics=[
+                tf.keras.metrics.AUC(multi_label=True)
+            ]
+        )
+
     return model
 
 def train_model(model, train_ds, valid_ds, config):
@@ -138,16 +155,6 @@ def train_model(model, train_ds, valid_ds, config):
 
     train_epoch = math.ceil(len(train) / BATCH_SIZE)
     val_epoch = math.ceil(len(valid) / BATCH_SIZE)
-
-    losses = ['binary_crossentropy' for i in range(config['NUM_CLASSES'])]
-    # Need to compile model with an individual loss function for each layer.
-    model.compile(optimizer=Adam(lr),
-        loss=losses,
-        metrics=[
-            tf.keras.metrics.Accuracy(), 
-            tf.keras.metrics.AUC(multi_label=True)
-        ]
-    )
 
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', mode='min', factor=0.1,
                                 patience=2, min_lr=1e-6, verbose=1)
@@ -178,8 +185,7 @@ if __name__ == '__main__':
 
     train_batches, valid_batches, test_batches = get_image_generators(train, valid, test, config)
 
-    num_classes = config['NUM_CLASSES']
-    model = get_model(num_classes)
+    model = get_model(config)
 
     history = train_model(model, train_batches, valid_batches, config)
 

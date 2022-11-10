@@ -3,7 +3,7 @@
     "IMG_WIDTH" : 224,
     "BATCH_SIZE" : 64,
     "TEST_BATCH" : 1,
-    "MAX_EPOCHS" : 5,
+    "MAX_EPOCHS" : 50,
     "IMAGE_BASE_PATH" : "/home/zzaiman/local/physionet.org/files/mimic-cxr-jpg/2.0.0/files",
     "META_BASE_PATH" : "/home/zzaiman/local/processed_splits",
     "NUM_CLASSES" : 14,
