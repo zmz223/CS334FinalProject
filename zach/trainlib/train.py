@@ -48,28 +48,29 @@ def load_datasets(config):
     return train, valid, test
 
 # Yields labels in required format.
-def generator_wrapper(generator, num_classes):
+def generator_wrapper(generator):
     for batch_x,batch_y in generator:
-        yield (batch_x,[batch_y[:,i] for i in range(num_classes)])
+        yield (batch_x,[batch_y[:,i] for i in range(14)])
 
 
 # Returns image data generators for train, valid, and test splits.
 def get_image_generators(train, valid, test, config):
 
-    HEIGHT = config['IMG_HEIGHT']
-    WIDTH = config['IMG_WIDTH']
-    BATCH_SIZE = config['BATCH_SIZE']
-    TEST_BATCH = config['TEST_BATCH']
-    num_classes = config['NUM_CLASSES']
+    HEIGHT = int(config['IMG_HEIGHT'])
+    WIDTH = int(config['IMG_WIDTH'])
+    BATCH_SIZE = int(config['BATCH_SIZE'])
+    TEST_BATCH = int(config['TEST_BATCH'])
+    num_classes = int(config['NUM_CLASSES'])
 
     labels = 'Atelectasis,Cardiomegaly,Consolidation,Edema,Enlarged Cardiomediastinum,Fracture,Lung Lesion,Lung Opacity,No Finding,Pleural Effusion,Pleural Other,Pneumonia,Pneumothorax,Support Devices'.split(',')
+    labels = np.array(labels)
     print(f"Num labels {str(len(labels))}", flush=True)
 
     train_gen = ImageDataGenerator(
-            rotation_range=15,
-            fill_mode='constant',
-            zoom_range=0.1,
-            horizontal_flip=True,
+            # rotation_range=15,
+            # fill_mode='constant',
+            # zoom_range=0.1,
+            # horizontal_flip=True,
             rescale = 1./255
     )
 
@@ -103,17 +104,17 @@ def get_image_generators(train, valid, test, config):
         directory=None,
         x_col="path",
         y_col=labels,
-        class_mode="raw",
+        class_mode=None,
         target_size=(HEIGHT, WIDTH),
         shuffle=False,
         batch_size=TEST_BATCH
     )
 
-    return generator_wrapper(train_batches, num_classes), generator_wrapper(validate_batches, num_classes), generator_wrapper(test_batches, num_classes)
+    return train_batches, validate_batches, test_batches
 
 def get_model(num_classes):
     
-    base_model = DenseNet121(weights='imagenet', include_top=False)
+    base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='max')
     x = base_model.output
     x = Dense(512, activation = 'relu')(x)
     x = Dropout(0.3)(x)
@@ -124,7 +125,7 @@ def get_model(num_classes):
         output.append(Dense(1, activation='sigmoid')(x))
     
     model = Model(inputs=base_model.input, outputs=output)
-
+    print(model.summary())
     return model
 
 def train_model(model, train_ds, valid_ds, config):
@@ -139,7 +140,6 @@ def train_model(model, train_ds, valid_ds, config):
     val_epoch = math.ceil(len(valid) / BATCH_SIZE)
 
     losses = ['binary_crossentropy' for i in range(config['NUM_CLASSES'])]
-    print(losses)
     # Need to compile model with an individual loss function for each layer.
     model.compile(optimizer=Adam(lr),
         loss=losses,
@@ -160,8 +160,8 @@ def train_model(model, train_ds, valid_ds, config):
 
     checkloss = ModelCheckpoint(weights_path, monitor='val_loss', mode='min', verbose=1, save_best_only=True, save_weights_only=False)
 
-    history = model.fit(train_ds,
-        validation_data=valid_ds,
+    history = model.fit(generator_wrapper(train_ds),
+        validation_data=generator_wrapper(valid_ds),
         steps_per_epoch=train_epoch,
         validation_steps=val_epoch,
         epochs=epochs,
