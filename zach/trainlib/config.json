@@ -8,6 +8,6 @@
     "META_BASE_PATH" : "/home/zzaiman/local/processed_splits",
     "NUM_CLASSES" : 14,
     "INITIAL_LR" : 1e-3,
-    "WEIGHTS_DIR" : "weights/model.hdf5"
-
+    "OUTPUT_DIR" : "/home/zzaiman/local/CS334FinalProject/zach/runs/run2",
+    "MODEL_ARCHITECTURE" : "densenet121"
 }
