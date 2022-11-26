@@ -22,6 +22,7 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 import argparse
 from classification_models.tfkeras import Classifiers
+from focal_loss import BinaryFocalLoss
 
 # Returns configuration in dictionary format.
 def load_config(config_path):
@@ -63,15 +64,14 @@ def get_image_generators(train, valid, test, config, preprocessing_func):
     TEST_BATCH = int(config['TEST_BATCH'])
     num_classes = int(config['NUM_CLASSES'])
 
-    labels = 'Atelectasis,Cardiomegaly,Consolidation,Edema,Enlarged Cardiomediastinum,Fracture,Lung Lesion,Lung Opacity,No Finding,Pleural Effusion,Pleural Other,Pneumonia,Pneumothorax,Support Devices'.split(',')
-    labels = np.array(labels)
+    # Make labels accessible through the entire program.
     print(f"Num labels {str(len(labels))}", flush=True)
 
     train_gen = ImageDataGenerator(
-            rotation_range=15,
-            fill_mode='constant',
-            zoom_range=0.1,
-            horizontal_flip=True,
+            # rotation_range=15,
+            # fill_mode='constant',
+            # zoom_range=0.1,
+            # horizontal_flip=True,
             preprocessing_function=preprocessing_func
     )
 
@@ -113,7 +113,18 @@ def get_image_generators(train, valid, test, config, preprocessing_func):
 
     return train_batches, validate_batches, test_batches
 
-def get_model(config):
+# Returns the class weights for each multioutput class for use in Focal Loss. 
+def get_class_weights(train):
+    class_weights = {}
+    for lab in labels:
+        tmpPos = np.sum(train[lab])
+        tmpNeg = train[lab].shape[0] - tmpPos
+        class_weights[lab] = tmpNeg / tmpPos
+
+    return class_weights
+
+# Returns the compiled model for training.
+def get_model(config, class_weights):
 
     num_classes = config['NUM_CLASSES']
     lr = config['INITIAL_LR']
@@ -123,28 +134,35 @@ def get_model(config):
 
     strategy = tf.distribute.MirroredStrategy()
 
+    # Use to distribute training across multiple GPUS.
     with strategy.scope():
         model_init, preprocessing_func = Classifiers.get(model_arch)
         base_model = model_init(include_top=False, input_shape=(height,width,3), weights='imagenet', pooling='max')
         # base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='max')
         x = base_model.output
-        end = Dense(512, activation = 'relu')(x)
+        x = Dense(512, activation = 'relu')(x)
+        x = Dropout(0.5)(x)
         
         # Add an individual classification layer for every class.
         output = []
         for i in range(num_classes):
-            x = Dropout(0.3)(end)
-            output.append(Dense(1, activation='sigmoid')(x))
+            layer_name = "".join(labels[i].split(" ")).lower()
+            output.append(Dense(1, activation='sigmoid', name=layer_name)(x))
         
         model = Model(inputs=base_model.input, outputs=output)
-        print(model.summary())
+        # Prints by default.
+        model.summary()
 
-        losses = ['binary_crossentropy' for i in range(num_classes)]
+        # Focal loss penalizes hard to classify samples. 
+        # Gamma = 2 is the emprically best hyperparameter.
+        losses = [BinaryFocalLoss(gamma=2, pos_weight=class_weights[lab]) for lab in labels]
         # Need to compile model with an individual loss function for each layer.
         model.compile(optimizer=Adam(lr),
             loss=losses,
             metrics=[
-                tf.keras.metrics.AUC(multi_label=True)
+                tf.keras.metrics.AUC(curve='ROC', multi_label=True),
+                tf.keras.metrics.AUC(curve='PR', multi_label=True)
+
             ]
         )
 
@@ -185,24 +203,24 @@ def train_model(model, train_ds, valid_ds, config):
     return history
 
 if __name__ == '__main__':
+    global labels
+    labels = 'Atelectasis,Cardiomegaly,Consolidation,Edema,Enlarged Cardiomediastinum,Fracture,Lung Lesion,Lung Opacity,No Finding,Pleural Effusion,Pleural Other,Pneumonia,Pneumothorax,Support Devices'.split(',')
+    labels = np.array(labels)
 
     config = load_config('config.json')
     train, valid, test = load_datasets(config)
-
-    model, preprocessing_func = get_model(config)
-
+    class_weights = get_class_weights(train)
+    model, preprocessing_func = get_model(config, class_weights)
     train_batches, valid_batches, test_batches = get_image_generators(train, valid, test, config, preprocessing_func)
-
     history = train_model(model, train_batches, valid_batches, config)
 
     # Predict on test set.
     Y_pred = model.predict(test_batches)
-
     output_path = config['OUTPUT_DIR']
+
     # Save pickle files of training history and predictions for further analysis.
     with open(os.path.join(output_path, 'predictions.pkl'), 'wb') as f:
         pickle.dump(Y_pred, f)
 
     with open(os.path.join('train_hist.pkl'), 'wb') as file_pi:
             pickle.dump(history.history, file_pi)
-
