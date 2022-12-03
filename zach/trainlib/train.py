@@ -23,6 +23,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 import argparse
 from classification_models.tfkeras import Classifiers
 from focal_loss import BinaryFocalLoss
+from tensorflow_addons.optimizers import CyclicalLearningRate
 
 # Returns configuration in dictionary format.
 def load_config(config_path):
@@ -68,10 +69,9 @@ def get_image_generators(train, valid, test, config, preprocessing_func):
     print(f"Num labels {str(len(labels))}", flush=True)
 
     train_gen = ImageDataGenerator(
-            # rotation_range=15,
-            # fill_mode='constant',
-            # zoom_range=0.1,
-            # horizontal_flip=True,
+            rotation_range=15,
+            fill_mode='constant',
+            horizontal_flip=True,
             preprocessing_function=preprocessing_func
     )
 
@@ -141,7 +141,7 @@ def get_model(config, class_weights):
         # base_model = DenseNet121(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='max')
         x = base_model.output
         x = Dense(512, activation = 'relu')(x)
-        x = Dropout(0.5)(x)
+        x = Dropout(0.3)(x)
         
         # Add an individual classification layer for every class.
         output = []
@@ -152,19 +152,6 @@ def get_model(config, class_weights):
         model = Model(inputs=base_model.input, outputs=output)
         # Prints by default.
         model.summary()
-
-        # Focal loss penalizes hard to classify samples. 
-        # Gamma = 2 is the emprically best hyperparameter.
-        losses = [BinaryFocalLoss(gamma=2, pos_weight=class_weights[lab]) for lab in labels]
-        # Need to compile model with an individual loss function for each layer.
-        model.compile(optimizer=Adam(lr),
-            loss=losses,
-            metrics=[
-                tf.keras.metrics.AUC(curve='ROC', multi_label=True),
-                tf.keras.metrics.AUC(curve='PR', multi_label=True)
-
-            ]
-        )
 
     return model, preprocessing_func
 
@@ -179,9 +166,31 @@ def train_model(model, train_ds, valid_ds, config):
     train_epoch = math.ceil(len(train) / BATCH_SIZE)
     val_epoch = math.ceil(len(valid) / BATCH_SIZE)
 
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', mode='min', factor=0.1,
-                                patience=2, min_lr=1e-6, verbose=1)
-    ES = EarlyStopping(monitor='val_loss', mode='min', patience=4, restore_best_weights=True)
+    step_size = (train_epoch * 6)
+
+    cyclical_learning_rate = CyclicalLearningRate(
+            initial_learning_rate=3e-7,
+            maximal_learning_rate=3e-5,
+            step_size=step_size,
+            scale_fn=lambda x: 1 / (2.0 ** (x - 1)),
+            scale_mode='cycle'
+    )
+
+    # Focal loss penalizes hard to classify samples. 
+    # Gamma = 2 is the emprically best hyperparameter.
+    losses = [BinaryFocalLoss(gamma=2, pos_weight=class_weights[lab]) for lab in labels]
+    # Need to compile model with an individual loss function for each layer.
+    model.compile(optimizer=Adam(learning_rate=cyclical_learning_rate),
+        loss=losses,
+        metrics=[
+            tf.keras.metrics.AUC(curve='ROC', multi_label=True),
+            tf.keras.metrics.AUC(curve='PR', multi_label=True)
+        ]
+    )
+
+    # reduce_lr = ReduceLROnPlateau(monitor='val_loss', mode='min', factor=0.1,
+    #                             patience=2, min_lr=1e-6, verbose=1)
+    ES = EarlyStopping(monitor='val_loss', mode='min', patience=6, restore_best_weights=True)
 
     weights_dir = os.path.join(output_path, 'weights/')
     if not os.path.exists(weights_dir):
@@ -197,7 +206,7 @@ def train_model(model, train_ds, valid_ds, config):
         validation_steps=val_epoch,
         epochs=epochs,
         shuffle=True,
-        callbacks=[reduce_lr, checkloss, ES]
+        callbacks=[checkloss, ES]
     )
 
     return history
@@ -222,5 +231,5 @@ if __name__ == '__main__':
     with open(os.path.join(output_path, 'predictions.pkl'), 'wb') as f:
         pickle.dump(Y_pred, f)
 
-    with open(os.path.join('train_hist.pkl'), 'wb') as file_pi:
+    with open(os.path.join(output_path, 'train_hist.pkl'), 'wb') as file_pi:
             pickle.dump(history.history, file_pi)

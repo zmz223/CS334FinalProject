@@ -8,6 +8,6 @@
     "META_BASE_PATH" : "/home/zzaiman/local/processed_splits",
     "NUM_CLASSES" : 14,
     "INITIAL_LR" : 1e-4,
-    "OUTPUT_DIR" : "/home/zzaiman/local/CS334FinalProject/zach/runs/run4",
+    "OUTPUT_DIR" : "/home/zzaiman/local/CS334FinalProject/zach/runs/run5",
     "MODEL_ARCHITECTURE" : "densenet121"
 }
