@@ -1,0 +1,10 @@
+{
+    "WEIGHTS_PATH" : "/home/zzaiman/local/CS334FinalProject/zach/runs/run5/weights/best_model.hdf5",
+    "RESULTS_CSV_PATH" : "/home/zzaiman/local/CS334FinalProject/zach/runs/run5/results_model_2.csv",
+    "IMAGE_ROOT_PATH" : "/home/zzaiman/local/physionet.org/files/mimic-cxr-jpg/2.0.0/files",
+    "DEST_DIR" : "./gradcams_out",
+    "LAST_LAYER_NAME" : "conv5_block16_2_conv",
+    "IMG_HEIGHT" : 224,
+    "IMG_WIDTH" : 224,
+    "NUM_GRADCAMS" : 1
+}

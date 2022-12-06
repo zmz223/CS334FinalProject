@@ -5,6 +5,6 @@
 #SBATCH -o %A.out
 #SBATCH -e %A.err
 
-cd /local/scratch/zzaiman/CS334FinalProject/zach/analysis
-source ../venv/bin/activate
+cd /local/scratch/zzaiman/CS334FinalProject/final_repo/gradcams
+source /local/scratch/zzaiman/CS334FinalProject/zach/venv/bin/activate
 python gradcams.py
