@@ -20,4 +20,5 @@ The abstract of our paper is stated below:
 * **trainlib**: contains training code, config file and data prep file
 
 ### Spotlight Slide 
-> INSERT SLIDE 
+
+![Spotlight Slide](https://github.com/zmz223/CS334FinalProject/final_repo/spotlightslide.png?raw=true)
