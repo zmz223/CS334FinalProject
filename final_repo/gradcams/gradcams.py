@@ -3,7 +3,6 @@ Code adapted from Tensorflow/Keras documentation.
 
 Generates a random sample of gradcams of size n. 
 '''
-
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras

@@ -1,0 +1,12 @@
+{
+    "BASELINE_DEST" : "/home/zzaiman/local/CS334FinalProject/final_repo/analysis/baseline",
+    "BASELINE_RESULTS_PATH" : "/home/zzaiman/local/CS334FinalProject/final_repo/runs/run1",
+    "FOCAL_DEST" : "/home/zzaiman/local/CS334FinalProject/final_repo/analysis/focal_loss",
+    "FOCAL_RESULTS_PATH" : "/home/zzaiman/local/CS334FinalProject/final_repo/runs/run4",
+    "CYCLICAL_DEST" : "/home/zzaiman/local/CS334FinalProject/final_repo/analysis/cyclical_lr",
+    "CYCLICAL_RESULTS_PATH" : "/home/zzaiman/local/CS334FinalProject/final_repo/runs/run5",
+    "ADMISSIONS_PATH" : "/home/zzaiman/local/physionet.org/files/mimiciv/2.0/hosp/admissions.csv",
+    "ICU_PATH" : "/home/zzaiman/local/physionet.org/files/mimiciv/2.0/icu/icustays.csv",
+    "DEMO_PATH" : "/home/zzaiman/local/physionet.org/files/mimiciv/2.0/hosp/patients.csv",
+    "META_PATH" : "/home/zzaiman/local/physionet.org/files/mimic-cxr-jpg/2.0.0/mimic-cxr-2.0.0-metadata.csv"
+}
