@@ -243,10 +243,11 @@ def generate_CI(y_true, y_pred):
     return ci_str
 
 # Calculate and plot ROC
-def calc_stratified_roc(df, strata, labels, dest_path):
+def calc_stratified_roc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
     fpr = {}
     tpr = {}
     auc = {}
+    results = []
     fig, ax = plt.subplots(nrows=2, ncols=7, figsize=(30, 10))
     plt.subplots_adjust(left=0.1,
                     bottom=0.1,
@@ -281,27 +282,30 @@ def calc_stratified_roc(df, strata, labels, dest_path):
             tpr[str(category) + '_' + lab] = ttpr
             auc[str(category) + '_' + lab] = tauc
             tci = generate_CI(ytrue, ypred)
-            ax[x, y].plot(tfpr, ttpr, label=f'{str(category)} auc={round(tauc, 2)}, ci={tci}')
+            ax[x, y].plot(tfpr, ttpr, label=f'{str(category)}')
             ax[x, y].title.set_text(lab)
-            ax[x, y].legend(loc = 8, bbox_to_anchor=(0.5, -0.82))
+            ax[x, y].legend(loc = 8, bbox_to_anchor=legend_loc)
             ax[x, y].set_xlabel('FPR')
             ax[x, y].set_ylabel('TPR')
-            
+            # Save the information
+            results.append({'Label' : lab, 'Strata' : category, 'ROCAUC' : tauc, 'CI_ROC' : tci})
 
     plt.savefig(dest_path)
+    return pd.DataFrame(results)
 
 # calculate and plot AUPRC
-def calc_stratified_prc(df, strata, labels, dest_path):
+def calc_stratified_prc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
     fpr = {}
     tpr = {}
     auc = {}
+    results = []
     fig, ax = plt.subplots(nrows=2, ncols=7, figsize=(30, 10))
     plt.subplots_adjust(left=0.1,
-                    bottom=0.1,
-                    right=0.9,
-                    top=0.9,
-                    hspace=0.97,
-                    wspace=0.2)
+                bottom=0.1,
+                right=0.9,
+                top=0.9,
+                hspace=0.97,
+                wspace=0.2)
     for i, lab in enumerate(labels):
         if i < 7:
             x = 0
@@ -329,12 +333,14 @@ def calc_stratified_prc(df, strata, labels, dest_path):
             tpr[str(category) + '_' + lab] = ttpr
             auc[str(category) + '_' + lab] = tauc
             tci = generate_CI(ytrue, ypred)
-            ax[x, y].plot(tfpr, ttpr, label=f'{str(category)} auc={round(tauc, 2)}, ci={tci}')
+            ax[x, y].plot(tfpr, ttpr, label=f'{str(category)}')
             ax[x, y].title.set_text(lab)
-            ax[x, y].legend(loc = 8, bbox_to_anchor=(0.5, -0.82))
+            ax[x, y].legend(loc = 8, bbox_to_anchor=legend_loc)
             ax[x, y].set_xlabel('FPR')
             ax[x, y].set_ylabel('TPR')
+            results.append({'Label' : lab, 'Strata' : category, 'PRAUC' : tauc, 'CI_PR' : tci})
     plt.savefig(dest_path)
+    return pd.DataFrame(results)
 
 def make_tabelone(df, labels, groupby, dest_path, latex=False):
     cols = list(labels)
@@ -347,6 +353,7 @@ def make_tabelone(df, labels, groupby, dest_path, latex=False):
 
 def distplots(df, labels, strata, dest_path):
     stratas = sorted(df[strata].unique())
+    print(stratas)
     fig, ax = plt.subplots(nrows=2, ncols=7, figsize=(45, 10))
     positions = [i for i in range(len(stratas))]
     for i, lab in enumerate(labels):
@@ -435,9 +442,12 @@ def stratify_icu(df, icu, metadata, labels, dest_path):
 
     # Generate plots
     icu_roc_dest_path = os.path.join(dest_path, 'icu_roc.png')
-    calc_stratified_roc(results_icu, 'study_in_icu', labels, icu_roc_dest_path)
+    roc_results = calc_stratified_roc(results_icu, 'study_in_icu', labels, icu_roc_dest_path)
     icu_pr_dest_path = os.path.join(dest_path, 'icu_pr.png')
-    calc_stratified_prc(results_icu, 'study_in_icu', labels, icu_pr_dest_path)
+    pr_results = calc_stratified_prc(results_icu, 'study_in_icu', labels, icu_pr_dest_path)
+
+    results = roc_results.merge(pr_results, on=['Label', 'Strata'])
+
 
     # Create tableone
     tableone_dest = os.path.join(dest_path, 'icu_tab1.csv')
@@ -446,6 +456,8 @@ def stratify_icu(df, icu, metadata, labels, dest_path):
     # Distplot
     distplot_dest = os.path.join(dest_path, 'icu_dist_plot.png')
     distplots(results_icu, labels, 'study_in_icu', distplot_dest)
+
+    return results
 
 def stratify_race(df, admissions, metadata, labels, dest_path):
     # bucket races. 
@@ -478,17 +490,21 @@ def stratify_race(df, admissions, metadata, labels, dest_path):
     df['race_bucket'] = df.apply(lambda row: label_races(row), axis=1)
     
     race_roc_dest = os.path.join(dest_path, 'race_roc.png')
-    calc_stratified_roc(df, 'race_bucket', labels, race_roc_dest)
+    roc_results = calc_stratified_roc(df, 'race_bucket', labels, race_roc_dest)
 
     race_pr_dest = os.path.join(dest_path, 'race_pr.png')
-    calc_stratified_prc(df, 'race_bucket', labels, race_pr_dest)
+    pr_results = calc_stratified_prc(df, 'race_bucket', labels, race_pr_dest)
 
     race_tableone_dest = os.path.join(dest_path, 'race_tableone.csv')
     make_tabelone(df, labels, 'race_bucket', race_tableone_dest, latex=True)
 
+    results = roc_results.merge(pr_results, on=['Label', 'Strata'])
+
     # Distplot
     distplot_dest = os.path.join(dest_path, 'race_dist_plot.png')
     distplots(df, labels, 'race_bucket', distplot_dest)
+
+    return results
 
 def stratify_insurance(df, admissions, metadata, labels, dest_path):
     metadata['StudyDate'] = pd.to_datetime(metadata['StudyDate'], format='%Y%m%d')
@@ -507,10 +523,13 @@ def stratify_insurance(df, admissions, metadata, labels, dest_path):
     assert df.shape[0] == orig_shape
 
     insurace_roc_dest = os.path.join(dest_path, 'insurance_roc.png')
-    calc_stratified_roc(df, 'insurance', labels, insurace_roc_dest)
+    roc_results = calc_stratified_roc(df, 'insurance', labels, insurace_roc_dest)
 
     insurace_pr_dest = os.path.join(dest_path, 'insurance_pr.png')
-    calc_stratified_prc(df, 'insurance', labels, insurace_pr_dest)
+    pr_results = calc_stratified_prc(df, 'insurance', labels, insurace_pr_dest)
+
+    results = roc_results.merge(pr_results, on=['Label', 'Strata'])
+
 
     insurance_tableone_dest = os.path.join(dest_path, 'insurance_tableone.csv')
     make_tabelone(df, labels, 'insurance', insurance_tableone_dest, latex=True)
@@ -518,6 +537,8 @@ def stratify_insurance(df, admissions, metadata, labels, dest_path):
     # Distplot
     distplot_dest = os.path.join(dest_path, 'insurace_dist_plot.png')
     distplots(df, labels, 'insurance', distplot_dest)
+
+    return results
 
 def stratify_sex(df, patients, labels, dest_path):
     orig_shape = df.shape[0]
@@ -529,13 +550,19 @@ def stratify_sex(df, patients, labels, dest_path):
     sex_pr_dest = os.path.join(dest_path, 'sex_pr.png')
     sex_tableone_path = os.path.join(dest_path, 'sex_tableone.csv')
 
-    calc_stratified_roc(df, 'gender', labels, sex_roc_dest)
-    calc_stratified_prc(df, 'gender', labels, sex_pr_dest)
+    roc_results = calc_stratified_roc(df, 'gender', labels, sex_roc_dest)
+    pr_results = calc_stratified_prc(df, 'gender', labels, sex_pr_dest)
+
+    results = roc_results.merge(pr_results, on=['Label', 'Strata'])
+
+
     make_tabelone(df, labels, 'gender', sex_tableone_path, latex=True) 
 
     # Distplot
     distplot_dest = os.path.join(dest_path, 'sex_dist_plot.png')
     distplots(df, labels, 'gender', distplot_dest)
+
+    return results
 
 def stratify_age(df, patients, labels, dest_path):
     #Generating age buckets
@@ -573,9 +600,14 @@ def stratify_age(df, patients, labels, dest_path):
     age_pr_dest = os.path.join(dest_path, 'age_pr.png')
     age_tableone_dest = os.path.join(dest_path, 'age_tableone.csv')
 
-    calc_stratified_roc(df, 'age_cohort', labels, age_roc_dest)
-    calc_stratified_prc(df, 'age_cohort', labels, age_pr_dest)
+    roc_results = calc_stratified_roc(df, 'age_cohort', labels, age_roc_dest)
+    pr_results = calc_stratified_prc(df, 'age_cohort', labels, age_pr_dest)
+
+    results = roc_results.merge(pr_results, on=['Label', 'Strata'])
+
     make_tabelone(df, labels, 'age_cohort', age_tableone_dest, latex=True)
+
+    return results
 
 
 # %%
@@ -598,11 +630,20 @@ def run_all(df, config, run_results_path, dest_path, labels):
             os.makedirs(path)
 
     run_analysis_overall(df.copy(), run_results_path, overall_dest, labels)
-    stratify_icu(df.copy(), icu.copy(), metadata.copy(), labels, icu_dest)
-    stratify_age(df.copy(), patients.copy(), labels, age_dest)
-    stratify_insurance(df.copy(), admissions.copy(), metadata.copy(), labels, insurance_dest)
-    stratify_race(df.copy(), admissions.copy(), metadata.copy(), labels, race_dest)
-    stratify_sex(df.copy(), patients.copy(), labels, sex_dest)
+    icu_results = stratify_icu(df.copy(), icu.copy(), metadata.copy(), labels, icu_dest)
+    age_results = stratify_age(df.copy(), patients.copy(), labels, age_dest)
+    insurance_results = stratify_insurance(df.copy(), admissions.copy(), metadata.copy(), labels, insurance_dest)
+    race_results = stratify_race(df.copy(), admissions.copy(), metadata.copy(), labels, race_dest)
+    sex_results = stratify_sex(df.copy(), patients.copy(), labels, sex_dest)
+
+    # Save results files.
+    results_path = 'results.csv'
+    icu_results.to_csv(os.path.join(icu_dest, results_path))
+    age_results.to_csv(os.path.join(age_dest, results_path))
+    insurance_results.to_csv(os.path.join(insurance_dest, results_path))
+    race_results.to_csv(os.path.join(race_dest, results_path))
+    sex_results.to_csv(os.path.join(sex_dest, results_path))
+
     
 
 # %%
@@ -617,6 +658,10 @@ if __name__ == '__main__':
     cyclical_results = config['CYCLICAL_RESULTS_PATH']
     
     results_baseline = pd.read_csv(os.path.join(baseline_results, 'results.csv'))
+    # Filter out laterals from baseline.
+    focal_did = results_focal['dicom_id'].unique()
+    results_baseline = results_baseline[results_baseline['dicom_id'].isin(focal_did)].reset_index(drop=True)
+
     results_focal = pd.read_csv(os.path.join(focal_results, 'results.csv'))
     result_cyclical = pd.read_csv(os.path.join(cyclical_results, 'results.csv'))
     
@@ -629,8 +674,6 @@ if __name__ == '__main__':
             counter+=1
             continue
         run_all(df.copy(), config, results_path, dest_path, labels)
-
-    
 
 # %%
 
