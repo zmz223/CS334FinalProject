@@ -18,7 +18,3 @@ The abstract of our paper is stated below:
 * **reports**: contains final presentation slide deck and final report 
 * **runs**: contains output directory for each CNN version trained (message authors for weights)
 * **trainlib**: contains training code, config file and data prep file
-
-### Spotlight Slide 
-
-![Spotlight Slide](CS334FinalProject/final_repo/spotlightslide.png)
