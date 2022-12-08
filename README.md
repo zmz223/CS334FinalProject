@@ -21,4 +21,4 @@ The abstract of our paper is stated below:
 
 ### Spotlight Slide 
 
-![Spotlight Slide](https://github.com/zmz223/CS334FinalProject/final_repo/main/spotlightslide.png?raw=true)
+![Spotlight Slide](https://github.com/zmz223/CS334FinalProject/final_repo/main/spotlightslide.png)
