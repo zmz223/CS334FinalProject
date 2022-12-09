@@ -220,7 +220,7 @@ def dict_to_df(dictionary, dest_path):
 
 # Helper functions for evaluating model performance
 # Generate 95% Confidence Intervals for each AUC score
-def generate_CI(y_true, y_pred):
+def generate_CI_roc(y_true, y_pred):
 
     n_bootstraps = 1000
     rng_seed = 2021  
@@ -233,6 +233,28 @@ def generate_CI(y_true, y_pred):
             continue
 
         score = roc_auc_score(y_true[indices], y_pred[indices])
+        bootstrapped_scores.append(score)
+    sorted_scores = np.array(bootstrapped_scores)
+    sorted_scores.sort()
+    #95% confidence interval
+    confidence_lower = sorted_scores[int(0.025 * len(sorted_scores))]
+    confidence_upper = sorted_scores[int(0.975 * len(sorted_scores))]
+    ci_str = '[{}, {}]'.format(str(round(confidence_lower, 3)), str(round(confidence_upper, 3)))
+    return ci_str
+
+def generate_CI_pr(y_true, y_pred):
+
+    n_bootstraps = 1000
+    rng_seed = 2021  
+    bootstrapped_scores = []
+
+    rng = np.random.RandomState(rng_seed)
+    for i in range(n_bootstraps):
+        indices = rng.randint(0, len(y_pred), len(y_pred))
+        if len(np.unique(y_true[indices])) < 2:
+            continue
+
+        score = average_precision_score(y_true[indices], y_pred[indices])
         bootstrapped_scores.append(score)
     sorted_scores = np.array(bootstrapped_scores)
     sorted_scores.sort()
@@ -266,8 +288,8 @@ def calc_stratified_roc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
             y = i - 7
         otpr, ofpr, _, = roc_curve(df[lab], df['pred_'+lab])
         oauc = roc_auc_score(df[lab], df['pred_'+lab])
-        ci = generate_CI(df[lab], df['pred_'+lab])
-        ax[x, y].plot(otpr, ofpr, label=f'Overall auc={round(oauc, 2)} ci={ci}')
+        ci = generate_CI_roc(df[lab], df['pred_'+lab])
+        ax[x, y].plot(otpr, ofpr, label=f'Overall')
         for category in df[strata].unique():
             tmp = df[df[strata] == category].reset_index(drop=True)
             ytrue = tmp[lab]
@@ -281,7 +303,7 @@ def calc_stratified_roc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
             fpr[str(category) + '_' + lab] = tfpr
             tpr[str(category) + '_' + lab] = ttpr
             auc[str(category) + '_' + lab] = tauc
-            tci = generate_CI(ytrue, ypred)
+            tci = generate_CI_roc(ytrue, ypred)
             ax[x, y].plot(tfpr, ttpr, label=f'{str(category)}')
             ax[x, y].title.set_text(lab)
             ax[x, y].legend(loc = 8, bbox_to_anchor=legend_loc)
@@ -317,8 +339,8 @@ def calc_stratified_prc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
             y = i - 7
         otpr, ofpr, _, = precision_recall_curve(df[lab], df['pred_'+lab])
         oauc = average_precision_score(df[lab], df['pred_'+lab])
-        ci = generate_CI(df[lab], df['pred_'+lab])
-        ax[x, y].plot(otpr, ofpr, label=f'Overall aps={round(oauc, 2)} ci={ci}')
+        ci = generate_CI_pr(df[lab], df['pred_'+lab])
+        ax[x, y].plot(otpr, ofpr, label=f'Overall')
         for category in df[strata].unique():      
             tmp = df[df[strata] == category].reset_index(drop=True)
             ytrue = tmp[lab]
@@ -332,7 +354,7 @@ def calc_stratified_prc(df, strata, labels, dest_path, legend_loc=(0.5, -0.82)):
             fpr[str(category) + '_' + lab] = tfpr
             tpr[str(category) + '_' + lab] = ttpr
             auc[str(category) + '_' + lab] = tauc
-            tci = generate_CI(ytrue, ypred)
+            tci = generate_CI_pr(ytrue, ypred)
             ax[x, y].plot(tfpr, ttpr, label=f'{str(category)}')
             ax[x, y].title.set_text(lab)
             ax[x, y].legend(loc = 8, bbox_to_anchor=legend_loc)
@@ -567,21 +589,9 @@ def stratify_sex(df, patients, labels, dest_path):
 def stratify_age(df, patients, labels, dest_path):
     #Generating age buckets
     def age_groups(x):
-        if x['anchor_age'] < 30:
-            return '20-29'
-        if x['anchor_age'] < 40:
-            return '30-39'
         if x['anchor_age'] < 50:
-            return '40-49'
-        if x['anchor_age'] < 60:
-            return '50-59'
-        if x['anchor_age'] < 70:
-            return '60-69'
-        if x['anchor_age'] < 80:
-            return '70-79'
-        if x['anchor_age'] < 90:
-            return '80-89'
-        else: return '90+'
+            return '<50'
+        else: return '50+'
 
     orig_shape = df.shape[0]
     df = df.merge(patients, on='subject_id')
@@ -670,9 +680,6 @@ if __name__ == '__main__':
                                 [baseline_results, focal_results, cyclical_results],
                                 [baseline_dest, focal_dest, cyclical_dest]):
 
-        if counter <= 1:
-            counter+=1
-            continue
         run_all(df.copy(), config, results_path, dest_path, labels)
 
 # %%

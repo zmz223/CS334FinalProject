@@ -1,15 +1,15 @@
 Label,0
-Atelectasis,0.251
-Cardiomegaly,0.322
-Consolidation,0.067
-Edema,0.228
-Enlarged Cardiomediastinum,0.04
-Fracture,0.033
-Lung Lesion,0.041
-Lung Opacity,0.434
-No Finding,0.236
-Pleural Effusion,0.426
-Pleural Other,0.024
-Pneumonia,0.117
-Pneumothorax,0.029
-Support Devices,0.394
+Atelectasis,0.29
+Cardiomegaly,0.357
+Consolidation,0.066
+Edema,0.271
+Enlarged Cardiomediastinum,0.044
+Fracture,0.026
+Lung Lesion,0.037
+Lung Opacity,0.476
+No Finding,0.211
+Pleural Effusion,0.474
+Pleural Other,0.019
+Pneumonia,0.112
+Pneumothorax,0.033
+Support Devices,0.552
